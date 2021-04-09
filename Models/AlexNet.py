@@ -1,6 +1,14 @@
 import tensorflow as tf
 
 class Model():
+    '''
+    AlexNet Model
+    Code taken from https://towardsdatascience.com/alexnet-8b05c5eb88d4
+    Which interprets paper:
+        Alex Krizhevsky, Ilya Sutskever, and Geoffrey E. Hinton.
+        Imagenet classification with deepconvolutional neural networks.
+        ACM, 60(6):84–90, May 2017.
+    '''
     def __init__(self, data):
         self.load_data(data)
         self.reshape_data()
@@ -11,6 +19,7 @@ class Model():
         self.y_train, self.y_valid, self.y_test = data["y_train"], data["y_valid"], data["y_test"]
         
     def reshape_data(self):
+        # BEGIN: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
         self.X_train = tf.map_fn(lambda i: tf.stack([i]*3, axis=-1), self.X_train).numpy()
         self.X_valid = tf.map_fn(lambda i: tf.stack([i]*3, axis=-1), self.X_valid).numpy()
         self.X_test = tf.map_fn(lambda i: tf.stack([i]*3, axis=-1), self.X_test).numpy()
@@ -25,8 +34,10 @@ class Model():
         self.X_valid = self.X_valid / 255.0
         self.X_test = self.X_test.reshape(100, 224, 224, 3)
         self.X_test = self.X_test / 255.0
+        # END: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
         
     def build_model(self):
+        # BEGIN: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
         self.model = tf.keras.models.Sequential([
                 tf.keras.layers.Conv2D(96, (11, 11), strides=(4, 4), activation='relu', \
                     kernel_initializer=tf.random_normal_initializer(mean=0.0, stddev=0.01), \
@@ -75,8 +86,10 @@ class Model():
         self.model.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9), \
                     loss='categorical_crossentropy', \
                 metrics=['accuracy', tf.keras.metrics.TopKCategoricalAccuracy(5)])
+        # END: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
 
     def train(self):
+        # BEGIN: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
         reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', \
                                                         factor=0.1, patience=1, \
                                 min_lr=0.00001)
@@ -84,6 +97,7 @@ class Model():
         self.model.fit(self.X_train, self.y_train, batch_size=128, \
                 validation_data=(self.X_valid, self.y_valid), \
             epochs=90, callbacks=[reduce_lr])
+        # END: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
     
     def summary(self):
         self.model.summary()

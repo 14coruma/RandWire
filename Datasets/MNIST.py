@@ -1,7 +1,11 @@
 import tensorflow as tf
 
 def get_data():
-    # BEGIN: Code from ________
+    '''
+    Grab MNIST (handwritten digits) from tensorflow module
+    Split data, properly format lables, and return as dict
+    '''
+    # BEGIN: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
     mnist = tf.keras.datasets.mnist
     (training_images, training_labels), (test_images, test_labels) = mnist.load_data()
 
@@ -24,7 +28,7 @@ def get_data():
 
     training_images = ttraining_images
     training_labels = ttraining_labels
-    # END: Code from ________
+    # END: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
 
     return {
         "X_train": training_images,
