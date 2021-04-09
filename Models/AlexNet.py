@@ -28,11 +28,11 @@ class Model():
         self.X_valid = tf.image.resize(self.X_valid, [224, 224]).numpy()
         self.X_test = tf.image.resize(self.X_test, [224, 224]).numpy()
 
-        self.X_train = self.X_train.reshape(800, 224, 224, 3)
+        self.X_train = self.X_train.reshape(len(self.X_train), 224, 224, 3)
         self.X_train = self.X_train / 255.0
-        self.X_valid = self.X_valid.reshape(200, 224, 224, 3)
+        self.X_valid = self.X_valid.reshape(len(self.X_valid), 224, 224, 3)
         self.X_valid = self.X_valid / 255.0
-        self.X_test = self.X_test.reshape(100, 224, 224, 3)
+        self.X_test = self.X_test.reshape(len(self.X_test), 224, 224, 3)
         self.X_test = self.X_test / 255.0
         # END: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
         

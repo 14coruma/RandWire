@@ -15,39 +15,41 @@ class Model():
         self.y_train, self.y_valid, self.y_test = data["y_train"], data["y_valid"], data["y_test"]
         
     def reshape_data(self):
-        self.X_train = tf.map_fn(lambda i: tf.stack([i]*3, axis=-1), self.X_train).numpy()
-        self.X_valid = tf.map_fn(lambda i: tf.stack([i]*3, axis=-1), self.X_valid).numpy()
-        self.X_test = tf.map_fn(lambda i: tf.stack([i]*3, axis=-1), self.X_test).numpy()
+        #self.X_train = tf.map_fn(lambda i: tf.stack([i]*3, axis=-1), self.X_train).numpy()
+        #self.X_valid = tf.map_fn(lambda i: tf.stack([i]*3, axis=-1), self.X_valid).numpy()
+        #self.X_test = tf.map_fn(lambda i: tf.stack([i]*3, axis=-1), self.X_test).numpy()
 
-        self.X_train = tf.image.resize(self.X_train, [32, 32]).numpy()
-        self.X_valid = tf.image.resize(self.X_valid, [32, 32]).numpy()
-        self.X_test = tf.image.resize(self.X_test, [32, 32]).numpy()
+        #self.X_train = tf.image.resize(self.X_train, [32, 32]).numpy()
+        #self.X_valid = tf.image.resize(self.X_valid, [32, 32]).numpy()
+        #self.X_test = tf.image.resize(self.X_test, [32, 32]).numpy()
 
-        self.X_train = self.X_train.reshape(800, 32, 32, 3)
+        self.X_train = self.X_train.reshape(len(self.X_train), 28, 28, 1)
         self.X_train = self.X_train / 255.0
-        self.X_valid = self.X_valid.reshape(200, 32, 32, 3)
+        self.X_valid = self.X_valid.reshape(len(self.X_valid), 28, 28, 1)
         self.X_valid = self.X_valid / 255.0
-        self.X_test = self.X_test.reshape(100, 32, 32, 3)
+        self.X_test = self.X_test.reshape(len(self.X_test), 28, 28, 1)
         self.X_test = self.X_test / 255.0
         
     def build_model(self):
         # BEGIN: Code adapted from https://www.tensorflow.org/tutorials/images/cnn
+        # BEGIN: Model adapted from https://linux-blog.anracom.com/2020/05/31/a-simple-cnn-for-the-mnist-datasets-ii-building-the-cnn-with-keras-and-a-first-test/
         self.model = models.Sequential([
-            layers.Conv2D(32, (3,3), activation='relu', input_shape=(32,32,3)),
+            layers.Conv2D(32, (3,3), activation='relu', input_shape=(28,28,1)),
             layers.MaxPooling2D((2,2)),
             layers.Conv2D(64, (3,3), activation='relu'),
             layers.MaxPooling2D((2,2)),
             layers.Conv2D(64, (3,3), activation='relu'),
             layers.Flatten(),
-            layers.Dense(64, activation='relu'),
-            layers.Dense(10)
+            layers.Dense(70, activation='relu'),
+            layers.Dense(30, activation='relu'),
+            layers.Dense(10, activation='softmax')
         ])
 
         self.model.compile(
             optimizer='adam',
             loss='categorical_crossentropy',
             metrics=['accuracy'])
-
+        # END: Model adapted from https://linux-blog.anracom.com/2020/05/31/a-simple-cnn-for-the-mnist-datasets-ii-building-the-cnn-with-keras-and-a-first-test/
         # END: Code adapted from https://www.tensorflow.org/tutorials/images/cnn
 
     def train(self):
