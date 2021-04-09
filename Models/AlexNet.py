@@ -98,6 +98,11 @@ class Model():
                 validation_data=(self.X_valid, self.y_valid), \
             epochs=90, callbacks=[reduce_lr])
         # END: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
+
+    def test(self):
+        res = self.model.evaluate(self.X_test, self.y_test, batch_size=128)
+        print("Test loss: {}".format(res[0]))
+        print("Test accuracy: {}".format(res[1]))
     
     def summary(self):
         self.model.summary()
