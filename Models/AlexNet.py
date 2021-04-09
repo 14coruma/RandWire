@@ -72,7 +72,7 @@ class Model():
                             tf.random_normal_initializer(mean=0.0, stddev=0.01))
             ])
 
-        self.model.compile(optimizer=tf.keras.optimizers.SGD(lr=0.01, momentum=0.9), \
+        self.model.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9), \
                     loss='categorical_crossentropy', \
                 metrics=['accuracy', tf.keras.metrics.TopKCategoricalAccuracy(5)])
 
@@ -85,5 +85,5 @@ class Model():
                 validation_data=(self.X_valid, self.y_valid), \
             epochs=90, callbacks=[reduce_lr])
     
-    def __str__(self):
-        return self.model.summary()
+    def summary(self):
+        self.model.summary()

@@ -6,7 +6,7 @@ import numpy as np
 def main():
     data = MNIST.get_data()
     model = AlexNet.Model(data)
-    print(model)
+    model.summary()
     model.train()
 
 if __name__ == "__main__":
