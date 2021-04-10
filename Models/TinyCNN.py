@@ -15,14 +15,6 @@ class Model():
         self.y_train, self.y_valid, self.y_test = data["y_train"], data["y_valid"], data["y_test"]
         
     def reshape_data(self):
-        #self.X_train = tf.map_fn(lambda i: tf.stack([i]*3, axis=-1), self.X_train).numpy()
-        #self.X_valid = tf.map_fn(lambda i: tf.stack([i]*3, axis=-1), self.X_valid).numpy()
-        #self.X_test = tf.map_fn(lambda i: tf.stack([i]*3, axis=-1), self.X_test).numpy()
-
-        #self.X_train = tf.image.resize(self.X_train, [32, 32]).numpy()
-        #self.X_valid = tf.image.resize(self.X_valid, [32, 32]).numpy()
-        #self.X_test = tf.image.resize(self.X_test, [32, 32]).numpy()
-
         self.X_train = self.X_train.reshape(len(self.X_train), 28, 28, 1)
         self.X_train = self.X_train / 255.0
         self.X_valid = self.X_valid.reshape(len(self.X_valid), 28, 28, 1)
