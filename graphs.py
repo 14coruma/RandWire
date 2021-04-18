@@ -1,6 +1,9 @@
 import numpy as np
 import random
 
+import networkx as nx
+import matplotlib.pyplot as plt
+
 def ER(N=32, P=0.25):
     edges = []
     # Randomly add edges
@@ -61,7 +64,32 @@ def WS(N=32, K=8, P=0.75):
                         edges.remove((start, end))
     return edges
 
+# Given a list of edges in directed graph,
+# figure out which ones are input or output nodes
+def input_output_nodes(edges, N=32):
+    inputs, outputs = [], []
+    for i in range(N):
+        is_input, is_output = True, True
+        for edge in edges:
+            if edge[0] == i: is_output = False
+            if edge[1] == i: is_input = False
+        if is_input: inputs.append(i)
+        if is_output: outputs.append(i)
+    return inputs, outputs
+
+def draw_graph(edges, inputs, outputs):
+    G = nx.MultiDiGraph()
+    G.add_edges_from(edges)
+    color_map = []
+    for node in G:
+        if node in inputs: color_map.append('blue')
+        elif node in outputs: color_map.append('red')
+        else: color_map.append("green")
+    plt.figure(figsize=(8,8))
+    nx.draw(G, node_color=color_map, pos=nx.kamada_kawai_layout(G))
+    plt.show()
+
 if __name__=="__main__":
-    #print(ER())
-    #print(BA())
-    print(WS())
+    edges = WS()
+    inputs, outputs = input_output_nodes(edges)
+    draw_graph(edges, inputs, outputs)
