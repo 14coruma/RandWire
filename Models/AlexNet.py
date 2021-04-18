@@ -3,7 +3,7 @@ import tensorflow as tf
 class Model():
     '''
     AlexNet Model
-    Code taken from https://towardsdatascience.com/alexnet-8b05c5eb88d4
+    Code adapted from https://towardsdatascience.com/alexnet-8b05c5eb88d4
     Which interprets paper:
         Alex Krizhevsky, Ilya Sutskever, and Geoffrey E. Hinton.
         Imagenet classification with deepconvolutional neural networks.
