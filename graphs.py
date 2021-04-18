@@ -52,7 +52,7 @@ def WS(N=32, K=8, P=0.75):
                 while(not valid_choice):
                     choice = random.randint(1,N)
                     # Make sure (j,j+choice) is not already in the graph
-                    if (j, (j+choice)%N) not in edges:
+                    if (j, (j+choice)%N) not in edges and j != (j+choice)%N:
                         valid_choice = True
                         # Add new edge
                         start = min(j, (j+choice)%N)
@@ -90,6 +90,7 @@ def draw_graph(edges, inputs, outputs):
     plt.show()
 
 if __name__=="__main__":
-    edges = WS()
-    inputs, outputs = input_output_nodes(edges)
+    N = 8
+    edges = WS(N, K=4, P=.5)
+    inputs, outputs = input_output_nodes(edges, N)
     draw_graph(edges, inputs, outputs)
