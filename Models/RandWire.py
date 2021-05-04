@@ -6,7 +6,7 @@ class Node(tf.Module):
     # https://github.com/seungwonpark/RandWireNN/blob/0850008e9204cef5fcb1fe508d4c99576b37f995/model/node.py#L8
     def __init__(self, in_degree, in_channel, out_channel, stride, name=None):
         super(Node, self).__init__(name=name)
-        self.single = (in_degree <= 1)
+        self.single = (in_degree == 1)
         if not self.single:
             # Aggregate sum
             self.agg_weight = tf.Variable(tf.zeros(in_degree), name="Agg", trainable=True)
@@ -16,7 +16,7 @@ class Node(tf.Module):
     # Referenced this PyTorch implementation while working:
     # https://github.com/seungwonpark/RandWireNN/blob/0850008e9204cef5fcb1fe508d4c99576b37f995/model/node.py#L8
     def __call__(self, x):
-        print("Node input shape: ", x.shape)
+        #print("Node input shape: ", x.shape)
         # input x shape: [Batch, Channel, N, M, in_degree]
         if self.single:
             x = tf.squeeze(x, axis=-1)
@@ -60,7 +60,7 @@ class DAG(tf.Module):
 
         self.nodes = [
             Node(
-                self.in_degree[node],
+                max(1, self.in_degree[node]),
                 in_channel,
                 out_channel,
                 2 if node in self.input_nodes else 1, #TODO Why is this the stride?
@@ -74,7 +74,7 @@ class DAG(tf.Module):
         # input x shape: [Batch, Channel, N, M]
         # Place x at position -1, so input nodes grab x values.
         # Remaining outputs should be None, as they are not yet computed
-        print("DAG input shape: ", x.shape)
+        #print("DAG input shape: ", x.shape)
         outputs = [None for node in range(self.num_nodes)] + [x]
         # Queue up input nodes
         queue = self.input_nodes.copy()
@@ -119,8 +119,8 @@ class RandWire(tf.keras.Model):
         self.dense = tf.keras.layers.Dense(10, activation='softmax')
 
     @tf.function
-    def __call__(self, x):
-        print("RandWire input shape: ", x.shape)
+    def __call__(self, x, training=False):
+        #print("RandWire input shape: ", x.shape)
         x = self.conv1(x)
         x = self.bn1(x)
         x = tf.nn.relu(x)
@@ -177,18 +177,16 @@ class Model:
     def build_model(self):
         self.graphs = load_graphs()
         self.model = RandWire(self.graphs)
-        self.model.compile()
+        self.model.compile(
+            optimizer='adam',
+            loss='categorical_crossentropy',
+            metrics=['accuracy']
+        )
 
     def train(self):
-        tf.summary.trace_on(graph=True)
-        tf.profiler.experimental.start(self.logdir)
-        print(self.model(tf.constant([self.X_train[0]])))
-        with self.writer.as_default():
-            tf.summary.trace_export(
-                name="my_func_trace",
-                step=0,
-                profiler_outdir=self.logdir
-            )
+        self.model.fit(self.X_train, self.y_train, batch_size=128,
+                validation_data=(self.X_valid, self.y_valid),
+            epochs=90)
 
 def load_graphs(location="Graphs/SavedGraphs", type='WS', ids=[0,1,2]):
     g = []
