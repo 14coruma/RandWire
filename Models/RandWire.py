@@ -6,7 +6,7 @@ class Node(tf.Module):
     # https://github.com/seungwonpark/RandWireNN/blob/0850008e9204cef5fcb1fe508d4c99576b37f995/model/node.py#L8
     def __init__(self, in_degree, in_channel, out_channel, stride, name=None):
         super(Node, self).__init__(name=name)
-        self.single = (in_degree == 1)
+        self.single = (in_degree <= 1)
         if not self.single:
             # Aggregate sum
             self.agg_weight = tf.Variable(tf.zeros(in_degree), name="Agg", trainable=True, aggregation=tf.VariableAggregation.SUM)
@@ -18,7 +18,7 @@ class Node(tf.Module):
     def __call__(self, x):
         # input x shape: [Batch, Channel, N, M, in_degree]
         if self.single:
-            x = x.squeeze(-1)
+            x = tf.squeeze(x, axis=-1)
         else:
             x = tf.linalg.matmul(x, tf.keras.activations.sigmoid(self.agg_weight))
         x = tf.nn.relu(x)
@@ -102,9 +102,9 @@ class RandWire(tf.keras.Model):
         self.conv1 = tf.keras.layers.Conv2D(self.chn//2, kernel_size=(3,3), padding='valid')
         self.bn1 = tf.keras.layers.BatchNormalization()
 
-        self.dag3 = DAG(self.chn, self.chn, graphs[0]['num_nodes'], graphs[0]['edges'])
-        self.dag4 = DAG(self.chn, 2*self.chn, graphs[1]['num_nodes'], graphs[1]['edges'])
-        self.dag5 = DAG(2*self.chn, 4*self.chn, graphs[2]['num_nodes'], graphs[2]['edges'])
+        #self.dag3 = DAG(self.chn, self.chn, graphs[0]['num_nodes'], graphs[0]['edges'])
+        #self.dag4 = DAG(self.chn, 2*self.chn, graphs[1]['num_nodes'], graphs[1]['edges'])
+        #self.dag5 = DAG(2*self.chn, 4*self.chn, graphs[2]['num_nodes'], graphs[2]['edges'])
 
         self.conv6 = tf.keras.layers.Conv2D(4*self.chn, kernel_size=(1,1))
         self.bn6 = tf.keras.layers.BatchNormalization()
@@ -115,15 +115,15 @@ class RandWire(tf.keras.Model):
         x = self.conv1(x)
         x = self.bn1(x)
 
-        x = self.dag3(x)
-        x = self.dag4(x)
-        x = self.dag5(x)
+        #x = self.dag3(x)
+        #x = self.dag4(x)
+        #x = self.dag5(x)
 
         x = tf.nn.relu(x)
         x = self.conv6(x)
         x = self.bn6(x)
         x = tf.nn.avg_pool2d(x, [1,1], [1,1], 'SAME')
-        x = x.view(x.size(0), -1)
+        x = tf.reshape(x, [-1])
         x = self.fc(x)
         x = tf.nn.softmax(x)
 
@@ -175,7 +175,6 @@ class Model:
     def train(self):
         tf.summary.trace_on(graph=True)
         tf.profiler.experimental.start(self.logdir)
-        print(self.X_train[0].shape)
         print(self.model(tf.constant([self.X_train[0]])))
         with self.writer.as_default():
             tf.summary.trace_export(
