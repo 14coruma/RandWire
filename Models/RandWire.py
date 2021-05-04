@@ -1,7 +1,8 @@
 import tensorflow as tf
 from datetime import datetime
 
-class Node(tf.Module):
+#class Node(tf.Module):
+class Node(tf.keras.Model):
     # Referenced this PyTorch implementation while working:
     # https://github.com/seungwonpark/RandWireNN/blob/0850008e9204cef5fcb1fe508d4c99576b37f995/model/node.py#L8
     def __init__(self, in_degree, in_channel, out_channel, stride, name=None):
@@ -15,6 +16,7 @@ class Node(tf.Module):
     
     # Referenced this PyTorch implementation while working:
     # https://github.com/seungwonpark/RandWireNN/blob/0850008e9204cef5fcb1fe508d4c99576b37f995/model/node.py#L8
+    @tf.function
     def __call__(self, x):
         #print("Node input shape: ", x.shape)
         # input x shape: [Batch, Channel, N, M, in_degree]
@@ -29,7 +31,8 @@ class Node(tf.Module):
         x = self.bn(x)
         return x
 
-class DAG(tf.Module):
+#class DAG(tf.Module):
+class DAG(tf.keras.Model):
     # Referenced this PyTorch implementation while working:
     # https://github.com/seungwonpark/RandWireNN/blob/0850008e9204cef5fcb1fe508d4c99576b37f995/model/dag_layer.py
     def __init__(self, in_channel, out_channel, num_nodes, edges, name=None):
@@ -70,6 +73,7 @@ class DAG(tf.Module):
 
     # Referenced this PyTorch implementation while working:
     # https://github.com/seungwonpark/RandWireNN/blob/0850008e9204cef5fcb1fe508d4c99576b37f995/model/dag_layer.py
+    @tf.function
     def __call__(self, x):
         # input x shape: [Batch, Channel, N, M]
         # Place x at position -1, so input nodes grab x values.
@@ -135,9 +139,7 @@ class RandWire(tf.keras.Model):
         x = tf.nn.relu(x)
         x = self.conv6(x)
         x = self.bn6(x)
-        #x = tf.nn.avg_pool2d(x, [1,1], [1,1], 'SAME')
         x = self.pool(x)
-        #x = tf.reshape(x, [-1])
         x = self.dense(x)
 
         return x
@@ -177,16 +179,26 @@ class Model:
     def build_model(self):
         self.graphs = load_graphs()
         self.model = RandWire(self.graphs)
+        optimizer = tf.keras.optimizers.SGD(learning_rate=0.1, momentum=0.9)
         self.model.compile(
-            optimizer='adam',
+            optimizer=optimizer,
             loss='categorical_crossentropy',
             metrics=['accuracy']
         )
+        print(self.model.variables)
 
     def train(self):
         self.model.fit(self.X_train, self.y_train, batch_size=128,
-                validation_data=(self.X_valid, self.y_valid),
+            validation_data=(self.X_valid, self.y_valid),
             epochs=90)
+    
+    def test(self):
+        res = self.model.evaluate(self.X_test, self.y_test, batch_size=128)
+        print("Test loss: {}".format(res[0]))
+        print("Test accuracy: {}".format(res[1]))
+    
+    def summary(self):
+        self.model.summary()
 
 def load_graphs(location="Graphs/SavedGraphs", type='WS', ids=[0,1,2]):
     g = []

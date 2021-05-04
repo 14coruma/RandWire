@@ -99,7 +99,7 @@ class Model():
         #    epochs=90, callbacks=[reduce_lr])
 
         self.model.fit(self.X_train, self.y_train, batch_size=128,
-                validation_data=(self.X_valid, self.y_valid),
+            validation_data=(self.X_valid, self.y_valid),
             epochs=90)
         # END: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
 
