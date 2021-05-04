@@ -1,10 +1,8 @@
 import tensorflow as tf
 from datetime import datetime
 
-import numpy as np
-
-class Node(tf.Module):
-#class Node(tf.keras.Model):
+#class Node(tf.Module):
+class Node(tf.keras.Model):
     # Referenced this PyTorch implementation while working:
     # https://github.com/seungwonpark/RandWireNN/blob/0850008e9204cef5fcb1fe508d4c99576b37f995/model/node.py#L8
     def __init__(self, in_degree, in_channel, out_channel, stride, name=None):
@@ -12,7 +10,7 @@ class Node(tf.Module):
         self.single = (in_degree == 1)
         if not self.single:
             # Aggregate sum
-            self.agg_weight = tf.Variable(tf.zeros(in_degree), name="Agg_{}".format(name), trainable=True)
+            self.agg_weight = tf.Variable(tf.zeros(in_degree), name="Agg", trainable=True)
         self.conv = tf.keras.layers.SeparableConv2D(filters=1, kernel_size=(3,3), strides=stride, padding='SAME', data_format='channels_first')
         self.bn = tf.keras.layers.BatchNormalization()
     
@@ -33,8 +31,8 @@ class Node(tf.Module):
         x = self.bn(x)
         return x
 
-class DAG(tf.Module):
-#class DAG(tf.keras.Model):
+#class DAG(tf.Module):
+class DAG(tf.keras.Model):
     # Referenced this PyTorch implementation while working:
     # https://github.com/seungwonpark/RandWireNN/blob/0850008e9204cef5fcb1fe508d4c99576b37f995/model/dag_layer.py
     def __init__(self, in_channel, out_channel, num_nodes, edges, name=None):
@@ -57,7 +55,10 @@ class DAG(tf.Module):
         # TODO: Maybe do this in the 'graph.py' code instead?
         self.input_nodes = [node for node in range(num_nodes) if self.in_degree[node] == 0]
         self.output_nodes = [node for node in range(num_nodes) if self.out_degree[node] == 0]
+        assert len(self.input_nodes) > 0, '%d' % len(self.input_nodes)
+        assert len(self.output_nodes) > 0, '%d' % len(self.output_nodes)
         for node in self.input_nodes:
+            assert len(self.rev_adjlist[node]) == 0
             self.rev_adjlist[node].append(-1)
 
         self.nodes = [
@@ -66,7 +67,7 @@ class DAG(tf.Module):
                 in_channel,
                 out_channel,
                 2 if node in self.input_nodes else 1, #TODO Why is this the stride?
-                name="node_{}".format(node)
+                name="node{}".format(node)
             )
             for node in range(num_nodes)]
 
@@ -97,26 +98,27 @@ class DAG(tf.Module):
                 if in_degree[next_node] == 0: queue.append(next_node)
 
         # Combine all outputs by averaging
-        #return tf.math.reduce_mean(tf.stack(y), axis=0)
-        # Combine all outputs by summing
         y = [outputs[node] for node in self.output_nodes]
-        return tf.math.reduce_sum(tf.stack(y), axis=0)
+        return tf.math.reduce_mean(tf.stack(y), axis=0)
 
 class RandWire(tf.keras.Model):
     # Referenced this PyTorch implementation while working:
     # https://github.com/seungwonpark/RandWireNN/blob/0850008e9204cef5fcb1fe508d4c99576b37f995/model/model.py
     def __init__(self, graphs, name=None):
         super().__init__(name=name)
-        self.chn = 128
+        self.chn = 3
         self.conv1 = tf.keras.layers.Conv2D(self.chn//2, kernel_size=(3,3), strides=2, padding='SAME', data_format='channels_first')
         self.bn1 = tf.keras.layers.BatchNormalization()
 
-        self.dag1 = DAG(self.chn, 2*self.chn, graphs[0]['num_nodes'], graphs[0]['edges'])
-        self.dag2 = DAG(2*self.chn, 4*self.chn, graphs[1]['num_nodes'], graphs[1]['edges'])
-        self.dag3 = DAG(4*self.chn, 8*self.chn, graphs[2]['num_nodes'], graphs[2]['edges'])
-
-        self.conv2 = tf.keras.layers.Conv2D(10, kernel_size=(1,1), strides=2, padding='SAME', data_format='channels_first')
+        self.conv2 = tf.keras.layers.Conv2D(self.chn//2, kernel_size=(3,3), strides=2, padding='SAME', data_format='channels_first')
         self.bn2 = tf.keras.layers.BatchNormalization()
+
+        self.dag3 = DAG(self.chn, self.chn, graphs[0]['num_nodes'], graphs[0]['edges'])
+        self.dag4 = DAG(self.chn, 2*self.chn, graphs[1]['num_nodes'], graphs[1]['edges'])
+        self.dag5 = DAG(2*self.chn, 4*self.chn, graphs[2]['num_nodes'], graphs[2]['edges'])
+
+        self.conv6 = tf.keras.layers.Conv2D(10, kernel_size=(1,1), strides=2, padding='SAME', data_format='channels_first')
+        self.bn6 = tf.keras.layers.BatchNormalization()
         self.pool = tf.keras.layers.GlobalAveragePooling2D()
         self.dense = tf.keras.layers.Dense(10, activation='softmax')
 
@@ -125,15 +127,18 @@ class RandWire(tf.keras.Model):
         #print("RandWire input shape: ", x.shape)
         x = self.conv1(x)
         x = self.bn1(x)
-        #x = tf.nn.relu(x)
-
-        x = self.dag1(x)
-        x = self.dag2(x)
-        x = self.dag3(x)
-
         x = tf.nn.relu(x)
+
         x = self.conv2(x)
         x = self.bn2(x)
+
+        x = self.dag3(x)
+        x = self.dag4(x)
+        x = self.dag5(x)
+
+        x = tf.nn.relu(x)
+        x = self.conv6(x)
+        x = self.bn6(x)
         x = self.pool(x)
         x = self.dense(x)
 
@@ -159,41 +164,38 @@ class Model:
         self.X_valid = tf.map_fn(lambda i: tf.stack([i]*3, axis=-1), self.X_valid).numpy()
         self.X_test = tf.map_fn(lambda i: tf.stack([i]*3, axis=-1), self.X_test).numpy()
 
-        self.X_train = tf.image.resize(self.X_train, [28, 28]).numpy()
-        self.X_valid = tf.image.resize(self.X_valid, [28, 28]).numpy()
-        self.X_test = tf.image.resize(self.X_test, [28, 28]).numpy()
+        self.X_train = tf.image.resize(self.X_train, [224, 224]).numpy()
+        self.X_valid = tf.image.resize(self.X_valid, [224, 224]).numpy()
+        self.X_test = tf.image.resize(self.X_test, [224, 224]).numpy()
 
-        self.X_train = self.X_train.reshape(len(self.X_train), 3, 28, 28)
+        self.X_train = self.X_train.reshape(len(self.X_train), 3, 224, 224)
         self.X_train = self.X_train / 255.0
-        self.X_valid = self.X_valid.reshape(len(self.X_valid), 3, 28, 28)
+        self.X_valid = self.X_valid.reshape(len(self.X_valid), 3, 224, 224)
         self.X_valid = self.X_valid / 255.0
-        self.X_test = self.X_test.reshape(len(self.X_test), 3, 28, 28)
+        self.X_test = self.X_test.reshape(len(self.X_test), 3, 224, 224)
         self.X_test = self.X_test / 255.0
         # END: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
 
     def build_model(self):
         self.graphs = load_graphs()
         self.model = RandWire(self.graphs)
-        #optimizer = tf.keras.optimizers.SGD(learning_rate=1, momentum=0.9)
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.01, epsilon=0.0001)
+        optimizer = tf.keras.optimizers.SGD(learning_rate=0.1, momentum=0.9)
         self.model.compile(
             optimizer=optimizer,
             loss='categorical_crossentropy',
             metrics=['accuracy']
         )
-        #print(self.model.variables)
+        print(self.model.variables)
 
-    def train(self, epochs=100, batch_size=2048):
-        return self.model.fit(self.X_train, self.y_train, batch_size=batch_size,
+    def train(self):
+        self.model.fit(self.X_train, self.y_train, batch_size=128,
             validation_data=(self.X_valid, self.y_valid),
-            epochs=epochs)
+            epochs=90)
     
     def test(self):
         res = self.model.evaluate(self.X_test, self.y_test, batch_size=128)
         print("Test loss: {}".format(res[0]))
         print("Test accuracy: {}".format(res[1]))
-        print(self.model.predict(np.array([self.X_test[0]]).reshape((1, 3, 28, 28))))
-        print(self.y_test[0])
     
     def summary(self):
         self.model.summary()

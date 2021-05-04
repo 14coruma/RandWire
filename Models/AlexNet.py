@@ -88,7 +88,7 @@ class Model():
             metrics=['accuracy'])
         # END: Code adapted from https://towardsdatascience.com/alexnet-8b05c5eb88d4
 
-    def train(self):
+    def train(self, epochs=100, batch_size=128):
         # BEGIN: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
         #reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', \
         #                                                factor=0.1, patience=1, \
@@ -98,9 +98,9 @@ class Model():
         #        validation_data=(self.X_valid, self.y_valid), \
         #    epochs=90, callbacks=[reduce_lr])
 
-        self.model.fit(self.X_train, self.y_train, batch_size=128,
+        return self.model.fit(self.X_train, self.y_train, batch_size=batch_size,
             validation_data=(self.X_valid, self.y_valid),
-            epochs=90)
+            epochs=epochs)
         # END: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
 
     def test(self):
