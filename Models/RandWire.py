@@ -9,18 +9,21 @@ class Node(tf.Module):
         self.single = (in_degree <= 1)
         if not self.single:
             # Aggregate sum
-            self.agg_weight = tf.Variable(tf.zeros(in_degree), name="Agg", trainable=True, aggregation=tf.VariableAggregation.SUM)
-        self.conv = tf.keras.layers.SeparableConv2D(filters=1, kernel_size=(3,3), padding='valid')
+            self.agg_weight = tf.Variable(tf.zeros(in_degree), name="Agg", trainable=True)
+        self.conv = tf.keras.layers.SeparableConv2D(filters=1, kernel_size=(3,3), strides=stride, padding='SAME', data_format='channels_first')
         self.bn = tf.keras.layers.BatchNormalization()
     
     # Referenced this PyTorch implementation while working:
     # https://github.com/seungwonpark/RandWireNN/blob/0850008e9204cef5fcb1fe508d4c99576b37f995/model/node.py#L8
     def __call__(self, x):
+        print("Node input shape: ", x.shape)
         # input x shape: [Batch, Channel, N, M, in_degree]
         if self.single:
             x = tf.squeeze(x, axis=-1)
         else:
-            x = tf.linalg.matmul(x, tf.keras.activations.sigmoid(self.agg_weight))
+            #x = tf.linalg.matmul(x, tf.keras.activations.sigmoid(self.agg_weight))
+            #x = tf.math.reduce_sum(x * tf.keras.activations.sigmoid(self.agg_weight))
+            x = tf.tensordot(x, tf.keras.activations.sigmoid(self.agg_weight), axes=1)
         x = tf.nn.relu(x)
         x = self.conv(x)
         x = self.bn(x)
@@ -71,6 +74,7 @@ class DAG(tf.Module):
         # input x shape: [Batch, Channel, N, M]
         # Place x at position -1, so input nodes grab x values.
         # Remaining outputs should be None, as they are not yet computed
+        print("DAG input shape: ", x.shape)
         outputs = [None for node in range(self.num_nodes)] + [x]
         # Queue up input nodes
         queue = self.input_nodes.copy()
@@ -98,34 +102,43 @@ class RandWire(tf.keras.Model):
     # https://github.com/seungwonpark/RandWireNN/blob/0850008e9204cef5fcb1fe508d4c99576b37f995/model/model.py
     def __init__(self, graphs, name=None):
         super().__init__(name=name)
-        self.chn = 8
-        self.conv1 = tf.keras.layers.Conv2D(self.chn//2, kernel_size=(3,3), padding='valid')
+        self.chn = 3
+        self.conv1 = tf.keras.layers.Conv2D(self.chn//2, kernel_size=(3,3), strides=2, padding='SAME', data_format='channels_first')
         self.bn1 = tf.keras.layers.BatchNormalization()
 
-        #self.dag3 = DAG(self.chn, self.chn, graphs[0]['num_nodes'], graphs[0]['edges'])
-        #self.dag4 = DAG(self.chn, 2*self.chn, graphs[1]['num_nodes'], graphs[1]['edges'])
-        #self.dag5 = DAG(2*self.chn, 4*self.chn, graphs[2]['num_nodes'], graphs[2]['edges'])
+        self.conv2 = tf.keras.layers.Conv2D(self.chn//2, kernel_size=(3,3), strides=2, padding='SAME', data_format='channels_first')
+        self.bn2 = tf.keras.layers.BatchNormalization()
 
-        self.conv6 = tf.keras.layers.Conv2D(4*self.chn, kernel_size=(1,1))
+        self.dag3 = DAG(self.chn, self.chn, graphs[0]['num_nodes'], graphs[0]['edges'])
+        self.dag4 = DAG(self.chn, 2*self.chn, graphs[1]['num_nodes'], graphs[1]['edges'])
+        self.dag5 = DAG(2*self.chn, 4*self.chn, graphs[2]['num_nodes'], graphs[2]['edges'])
+
+        self.conv6 = tf.keras.layers.Conv2D(10, kernel_size=(1,1), strides=2, padding='SAME', data_format='channels_first')
         self.bn6 = tf.keras.layers.BatchNormalization()
-        self.fc = tf.keras.layers.Softmax()
+        self.pool = tf.keras.layers.GlobalAveragePooling2D()
+        self.dense = tf.keras.layers.Dense(10, activation='softmax')
 
     @tf.function
     def __call__(self, x):
+        print("RandWire input shape: ", x.shape)
         x = self.conv1(x)
         x = self.bn1(x)
+        x = tf.nn.relu(x)
 
-        #x = self.dag3(x)
-        #x = self.dag4(x)
-        #x = self.dag5(x)
+        x = self.conv2(x)
+        x = self.bn2(x)
+
+        x = self.dag3(x)
+        x = self.dag4(x)
+        x = self.dag5(x)
 
         x = tf.nn.relu(x)
         x = self.conv6(x)
         x = self.bn6(x)
-        x = tf.nn.avg_pool2d(x, [1,1], [1,1], 'SAME')
-        x = tf.reshape(x, [-1])
-        x = self.fc(x)
-        x = tf.nn.softmax(x)
+        #x = tf.nn.avg_pool2d(x, [1,1], [1,1], 'SAME')
+        x = self.pool(x)
+        #x = tf.reshape(x, [-1])
+        x = self.dense(x)
 
         return x
 
@@ -153,12 +166,6 @@ class Model:
         self.X_valid = tf.image.resize(self.X_valid, [224, 224]).numpy()
         self.X_test = tf.image.resize(self.X_test, [224, 224]).numpy()
 
-        #self.X_train = self.X_train.reshape(len(self.X_train), 224, 224, 3)
-        #self.X_train = self.X_train / 255.0
-        #self.X_valid = self.X_valid.reshape(len(self.X_valid), 224, 224, 3)
-        #self.X_valid = self.X_valid / 255.0
-        #self.X_test = self.X_test.reshape(len(self.X_test), 224, 224, 3)
-        #self.X_test = self.X_test / 255.0
         self.X_train = self.X_train.reshape(len(self.X_train), 3, 224, 224)
         self.X_train = self.X_train / 255.0
         self.X_valid = self.X_valid.reshape(len(self.X_valid), 3, 224, 224)
