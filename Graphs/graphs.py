@@ -89,8 +89,17 @@ def draw_graph(edges, inputs, outputs):
     nx.draw(G, node_color=color_map, pos=nx.kamada_kawai_layout(G))
     plt.show()
 
+def save_graph(N, edges, type='WS', id=0):
+    f = open("./SavedGraphs/{}_{}".format(type, id), 'w')
+    f.write("{}\n".format(N))
+    for edge in edges:
+        f.write("{}\n".format(edge))
+    f.close()
+
 if __name__=="__main__":
-    N = 8
-    edges = WS(N, K=4, P=.5)
-    inputs, outputs = input_output_nodes(edges, N)
-    draw_graph(edges, inputs, outputs)
+    N = 32
+    for id in range(3):
+        edges = WS(N, K=4, P=.5)
+        save_graph(N, edges, 'WS', id)
+    #inputs, outputs = input_output_nodes(edges, N)
+    #draw_graph(edges, inputs, outputs)

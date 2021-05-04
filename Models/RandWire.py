@@ -9,14 +9,22 @@ class Node(tf.Module):
         self.single = (in_degree == 1)
         if not self.single:
             # Aggregate sum
-            self.agg_weight = None #TODO
-        self.conv = None #TODO
-        self.bn = None #TODO
+            self.agg_weight = tf.Variable(tf.zeros(in_degree), name="Agg", trainable=True, aggregation=tf.VariableAggregation.SUM)
+        self.conv = tf.keras.layers.SeparableConv2D(filters=1, kernel_size=(3,3), padding='valid')
+        self.bn = tf.keras.layers.BatchNormalization()
     
     # Referenced this PyTorch implementation while working:
     # https://github.com/seungwonpark/RandWireNN/blob/0850008e9204cef5fcb1fe508d4c99576b37f995/model/node.py#L8
     def __call__(self, x):
-        pass
+        # input x shape: [Batch, Channel, N, M, in_degree]
+        if self.single:
+            x = x.squeeze(-1)
+        else:
+            x = tf.linalg.matmul(x, tf.keras.activations.sigmoid(self.agg_weight))
+        x = tf.nn.relu(x)
+        x = self.conv(x)
+        x = self.bn(x)
+        return x
 
 class DAG(tf.Module):
     # Referenced this PyTorch implementation while working:
@@ -53,7 +61,7 @@ class DAG(tf.Module):
                 in_channel,
                 out_channel,
                 2 if node in self.input_nodes else 1, #TODO Why is this the stride?
-                name=str(node)
+                name="node{}".format(node)
             )
             for node in range(num_nodes)]
 
@@ -85,23 +93,48 @@ class DAG(tf.Module):
         y = [outputs[node] for node in self.output_nodes]
         return tf.math.reduce_mean(tf.stack(y), axis=0)
 
-class RandWire(tf.Module):
+class RandWire(tf.keras.Model):
     # Referenced this PyTorch implementation while working:
     # https://github.com/seungwonpark/RandWireNN/blob/0850008e9204cef5fcb1fe508d4c99576b37f995/model/model.py
-    def __init__(self, name=None):
+    def __init__(self, graphs, name=None):
         super().__init__(name=name)
-        self.dag = DAG(self.chn, )
-        #self.dag3 = DAG(in_features=3, out_features=3)
-        #self.dag4 = DAG(in_features=3, out_features=2)
-        #self.dag5 = DAG(in_features=3, out_features=2)
+        self.chn = 8
+        self.conv1 = tf.keras.layers.Conv2D(self.chn//2, kernel_size=(3,3), padding='valid')
+        self.bn1 = tf.keras.layers.BatchNormalization()
+
+        self.dag3 = DAG(self.chn, self.chn, graphs[0]['num_nodes'], graphs[0]['edges'])
+        self.dag4 = DAG(self.chn, 2*self.chn, graphs[1]['num_nodes'], graphs[1]['edges'])
+        self.dag5 = DAG(2*self.chn, 4*self.chn, graphs[2]['num_nodes'], graphs[2]['edges'])
+
+        self.conv6 = tf.keras.layers.Conv2D(4*self.chn, kernel_size=(1,1))
+        self.bn6 = tf.keras.layers.BatchNormalization()
+        self.fc = tf.keras.layers.Softmax()
 
     @tf.function
     def __call__(self, x):
-        x = self.dag(x)
+        x = self.conv1(x)
+        x = self.bn1(x)
+
+        x = self.dag3(x)
+        x = self.dag4(x)
+        x = self.dag5(x)
+
+        x = tf.nn.relu(x)
+        x = self.conv6(x)
+        x = self.bn6(x)
+        x = tf.nn.avg_pool2d(x, [1,1], [1,1], 'SAME')
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        x = tf.nn.softmax(x)
+
         return x
 
 class Model:
     def __init__(self, data):
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.logdir = "Models/logs/func/%s" % stamp
+        self.writer = tf.summary.create_file_writer(self.logdir)
+
         self.load_data(data)
         self.reshape_data()
         self.build_model()
@@ -120,16 +153,47 @@ class Model:
         self.X_valid = tf.image.resize(self.X_valid, [224, 224]).numpy()
         self.X_test = tf.image.resize(self.X_test, [224, 224]).numpy()
 
-        self.X_train = self.X_train.reshape(len(self.X_train), 224, 224, 3)
+        #self.X_train = self.X_train.reshape(len(self.X_train), 224, 224, 3)
+        #self.X_train = self.X_train / 255.0
+        #self.X_valid = self.X_valid.reshape(len(self.X_valid), 224, 224, 3)
+        #self.X_valid = self.X_valid / 255.0
+        #self.X_test = self.X_test.reshape(len(self.X_test), 224, 224, 3)
+        #self.X_test = self.X_test / 255.0
+        self.X_train = self.X_train.reshape(len(self.X_train), 3, 224, 224)
         self.X_train = self.X_train / 255.0
-        self.X_valid = self.X_valid.reshape(len(self.X_valid), 224, 224, 3)
+        self.X_valid = self.X_valid.reshape(len(self.X_valid), 3, 224, 224)
         self.X_valid = self.X_valid / 255.0
-        self.X_test = self.X_test.reshape(len(self.X_test), 224, 224, 3)
+        self.X_test = self.X_test.reshape(len(self.X_test), 3, 224, 224)
         self.X_test = self.X_test / 255.0
         # END: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
 
-    def build_model():
-        pass
+    def build_model(self):
+        self.graphs = load_graphs()
+        self.model = RandWire(self.graphs)
+        self.model.compile()
+
+    def train(self):
+        tf.summary.trace_on(graph=True)
+        tf.profiler.experimental.start(self.logdir)
+        print(self.X_train[0].shape)
+        print(self.model(tf.constant([self.X_train[0]])))
+        with self.writer.as_default():
+            tf.summary.trace_export(
+                name="my_func_trace",
+                step=0,
+                profiler_outdir=self.logdir
+            )
+
+def load_graphs(location="Graphs/SavedGraphs", type='WS', ids=[0,1,2]):
+    g = []
+    for id in ids:
+        f = open("{}/{}_{}".format(location, type, id), 'r')
+        N = int(f.readline())
+        edges = []
+        for i in range(N):
+            edges.append(tuple(map(int, f.readline()[1:-2].split(', '))))
+        g.append({'num_nodes': N, 'edges': edges})
+    return g
 
 if __name__ == "__main__":
     # Set up logging
@@ -137,15 +201,18 @@ if __name__ == "__main__":
     logdir = "logs/func/%s" % stamp
     writer = tf.summary.create_file_writer(logdir)
 
-    # Create new model
-    m = RandWire(name="simple")
+    # Load graphs
+    g = load_graphs("../Graphs/SavedGraphs", type='WS', ids=[0,1,2])
 
-    tf.summary.trace_on(graph=True)
-    tf.profiler.experimental.start(logdir)
-    print(m(tf.constant([[2.0, 2.0, 2.0]])))
-    with writer.as_default():
-        tf.summary.trace_export(
-            name="my_func_trace",
-            step=0,
-            profiler_outdir=logdir
-        )
+    # Create new model
+    #m = RandWire(g, name="simple")
+
+    #tf.summary.trace_on(graph=True)
+    #tf.profiler.experimental.start(logdir)
+    #print(m(tf.constant([[2.0, 2.0, 2.0, 2.0]])))
+    #with writer.as_default():
+    #    tf.summary.trace_export(
+    #        name="my_func_trace",
+    #        step=0,
+    #        profiler_outdir=logdir
+    #    )
