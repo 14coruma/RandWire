@@ -140,14 +140,14 @@ class RandWire(tf.keras.Model):
         return x
 
 class Model:
-    def __init__(self, data):
+    def __init__(self, data, graph_type='WS'):
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         self.logdir = "Models/logs/func/%s" % stamp
         self.writer = tf.summary.create_file_writer(self.logdir)
 
         self.load_data(data)
         self.reshape_data()
-        self.build_model()
+        self.build_model(graph_type=graph_type)
 
     def load_data(self, data):
         self.X_train, self.X_valid, self.X_test = data["X_train"], data["X_valid"], data["X_test"]
@@ -171,11 +171,11 @@ class Model:
         self.X_test = self.X_test / 255.0
         # END: Code from https://towardsdatascience.com/alexnet-8b05c5eb88d4
 
-    def build_model(self):
-        self.graphs = load_graphs()
+    def build_model(self, graph_type='WS'):
+        self.graphs = load_graphs(type=graph_type)
         self.model = RandWire(self.graphs)
-        #optimizer = tf.keras.optimizers.SGD(learning_rate=1, momentum=0.9)
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.01, epsilon=0.0001)
+        #optimizer = tf.keras.optimizers.SGD(learning_rate=.1, momentum=0.9)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001, epsilon=0.00001)
         self.model.compile(
             optimizer=optimizer,
             loss='categorical_crossentropy',

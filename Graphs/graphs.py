@@ -99,7 +99,9 @@ def save_graph(N, edges, type='WS', id=0):
 if __name__=="__main__":
     N = 32
     for id in range(3):
-        edges = WS(N, K=4, P=.75)
-        save_graph(N, edges, 'WS', id)
+        #edges = WS(N, K=4, P=.75)
+        #save_graph(N, edges, 'WS', id)
+        edges = BA(N, 5)
+        save_graph(N, edges, 'BA', id)
         inputs, outputs = input_output_nodes(edges, N)
         draw_graph(edges, inputs, outputs)
